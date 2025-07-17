@@ -227,11 +227,17 @@ func (b *Bot) handleCallbackQuery(callback *tgbotapi.CallbackQuery) {
 
 // confirmAddArtist adds the selected artist to user's favorites
 func (b *Bot) confirmAddArtist(chatID int64, userTelegramID int64, spotifyID, artistName string) {
-	// Get user from database
+	// Get or create user in database
 	user, err := b.db.GetUserByTelegramID(userTelegramID)
 	if err != nil {
-		b.sendMessage(chatID, "Sorry, there was an error accessing your account.")
-		return
+		// User doesn't exist, try to create them
+		// We don't have full user info here, so we'll use basic info
+		user, err = b.db.CreateUser(userTelegramID, "", "", "")
+		if err != nil {
+			log.Printf("Failed to create user: %v", err)
+			b.sendMessage(chatID, "Sorry, there was an error setting up your account. Please try /start first.")
+			return
+		}
 	}
 
 	// Add artist to favorites
@@ -257,8 +263,13 @@ func (b *Bot) confirmAddArtist(chatID int64, userTelegramID int64, spotifyID, ar
 func (b *Bot) handleListArtists(message *tgbotapi.Message) {
 	user, err := b.db.GetUserByTelegramID(message.From.ID)
 	if err != nil {
-		b.sendMessage(message.Chat.ID, "Sorry, there was an error accessing your account.")
-		return
+		// User doesn't exist, auto-register them
+		user, err = b.db.CreateUser(message.From.ID, message.From.UserName, message.From.FirstName, message.From.LastName)
+		if err != nil {
+			log.Printf("Failed to create user: %v", err)
+			b.sendMessage(message.Chat.ID, "Sorry, there was an error setting up your account. Please try /start first.")
+			return
+		}
 	}
 
 	artists, err := b.db.GetUserArtists(user.ID)
@@ -288,8 +299,13 @@ func (b *Bot) handleListArtists(message *tgbotapi.Message) {
 func (b *Bot) handleRemoveArtist(message *tgbotapi.Message) {
 	user, err := b.db.GetUserByTelegramID(message.From.ID)
 	if err != nil {
-		b.sendMessage(message.Chat.ID, "Sorry, there was an error accessing your account.")
-		return
+		// User doesn't exist, auto-register them
+		user, err = b.db.CreateUser(message.From.ID, message.From.UserName, message.From.FirstName, message.From.LastName)
+		if err != nil {
+			log.Printf("Failed to create user: %v", err)
+			b.sendMessage(message.Chat.ID, "Sorry, there was an error setting up your account. Please try /start first.")
+			return
+		}
 	}
 
 	artists, err := b.db.GetUserArtists(user.ID)
@@ -324,8 +340,13 @@ func (b *Bot) handleRemoveArtist(message *tgbotapi.Message) {
 func (b *Bot) confirmRemoveArtist(chatID int64, userTelegramID int64, artistName string) {
 	user, err := b.db.GetUserByTelegramID(userTelegramID)
 	if err != nil {
-		b.sendMessage(chatID, "Sorry, there was an error accessing your account.")
-		return
+		// User doesn't exist, auto-register them (though this shouldn't normally happen)
+		user, err = b.db.CreateUser(userTelegramID, "", "", "")
+		if err != nil {
+			log.Printf("Failed to create user: %v", err)
+			b.sendMessage(chatID, "Sorry, there was an error setting up your account. Please try /start first.")
+			return
+		}
 	}
 
 	err = b.db.RemoveUserArtist(user.ID, artistName)
@@ -342,8 +363,13 @@ func (b *Bot) confirmRemoveArtist(chatID int64, userTelegramID int64, artistName
 func (b *Bot) handleGeneratePlaylist(message *tgbotapi.Message) {
 	user, err := b.db.GetUserByTelegramID(message.From.ID)
 	if err != nil {
-		b.sendMessage(message.Chat.ID, "Sorry, there was an error accessing your account.")
-		return
+		// User doesn't exist, auto-register them
+		user, err = b.db.CreateUser(message.From.ID, message.From.UserName, message.From.FirstName, message.From.LastName)
+		if err != nil {
+			log.Printf("Failed to create user: %v", err)
+			b.sendMessage(message.Chat.ID, "Sorry, there was an error setting up your account. Please try /start first.")
+			return
+		}
 	}
 
 	artists, err := b.db.GetUserArtists(user.ID)

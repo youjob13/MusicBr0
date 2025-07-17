@@ -175,7 +175,7 @@ git push origin release
 
 ```bash
 # Scale to 1 dyno (free tier)
-heroku ps:scale web=1 --app your-music-bot
+heroku ps:scale worker=1 --app your-music-bot
 
 # Check dyno status
 heroku ps --app your-music-bot

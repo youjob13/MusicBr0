@@ -1,1 +1,1 @@
-web: bin/music-bot 
+worker: bin/music-bot 
