@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  music-bot:
+    build: .
+    container_name: music-bot
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - DATABASE_PATH=/root/data/music_bot.db
+      - LOG_LEVEL=info
+      - TZ=UTC
+    volumes:
+      - ./data:/root/data
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "main"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -1,0 +1,15 @@
+# Environment Variables Configuration
+# Copy this file to .env and fill in your actual values
+
+# Telegram Bot Configuration
+TELEGRAM_TOKEN=your_telegram_bot_token_here
+
+# Spotify API Configuration  
+SPOTIFY_CLIENT_ID=your_spotify_client_id_here
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret_here
+
+# Database Configuration
+DATABASE_PATH=music_bot.db
+
+# Logging Configuration
+LOG_LEVEL=info 

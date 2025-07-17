@@ -1,0 +1,45 @@
+{
+  "name": "Music Bot",
+  "description": "A Telegram bot that generates personalized music playlists based on your favorite artists using the Spotify API",
+  "repository": "https://github.com/youjob13/MusicBr0",
+  "logo": "https://node-js-sample.herokuapp.com/node.png",
+  "keywords": ["telegram", "bot", "music", "spotify", "playlist", "go"],
+  "image": "heroku/go",
+  "stack": "heroku-22",
+  "buildpacks": [
+    {
+      "url": "heroku/go"
+    }
+  ],
+  "env": {
+    "TELEGRAM_TOKEN": {
+      "description": "Bot token from @BotFather on Telegram",
+      "required": true
+    },
+    "SPOTIFY_CLIENT_ID": {
+      "description": "Client ID from Spotify Developer Dashboard",
+      "required": true
+    },
+    "SPOTIFY_CLIENT_SECRET": {
+      "description": "Client Secret from Spotify Developer Dashboard",
+      "required": true
+    },
+    "DATABASE_PATH": {
+      "description": "SQLite database file path",
+      "value": "/tmp/music_bot.db",
+      "required": false
+    },
+    "LOG_LEVEL": {
+      "description": "Logging level (debug, info, warn, error)",
+      "value": "info",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "eco"
+    }
+  },
+  "addons": []
+}

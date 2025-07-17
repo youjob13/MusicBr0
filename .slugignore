@@ -1,0 +1,32 @@
+# Development files
+*.md
+!README.md
+.git/
+.gitignore
+
+# Documentation and examples
+Go_Telegram_Music_Bot_Study_Plan.md
+Progress_Checklist.md
+CHANGELOG.md
+env_example.txt
+
+# Build artifacts and logs
+*.log
+*.exe
+music-bot
+music_bot.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local development scripts
+start.sh
+start.bat 
