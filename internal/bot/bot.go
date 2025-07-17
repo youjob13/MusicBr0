@@ -396,7 +396,7 @@ func (b *Bot) handleGeneratePlaylist(message *tgbotapi.Message) {
 	}
 
 	// Generate playlist
-	tracks, err := b.spotifyClient.GeneratePlaylistForArtists(spotifyIDs, 20)
+	tracks, err := b.spotifyClient.GeneratePlaylistForArtists(spotifyIDs, 30)
 	if err != nil {
 		log.Printf("Failed to generate playlist: %v", err)
 		b.sendMessage(message.Chat.ID, "Sorry, I couldn't generate a playlist right now. Please try again later.")
@@ -462,7 +462,7 @@ func (b *Bot) SendDailyPlaylist(userTelegramID int64) error {
 	}
 
 	// Generate playlist
-	tracks, err := b.spotifyClient.GeneratePlaylistForArtists(spotifyIDs, 15)
+	tracks, err := b.spotifyClient.GeneratePlaylistForArtists(spotifyIDs, 25)
 	if err != nil {
 		return fmt.Errorf("failed to generate playlist: %w", err)
 	}
