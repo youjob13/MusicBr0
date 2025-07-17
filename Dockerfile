@@ -33,8 +33,8 @@ RUN mkdir -p /root/data
 # Set timezone
 ENV TZ=UTC
 
-# Expose port (Heroku assigns PORT dynamically)
-EXPOSE $PORT
+# Expose port (Heroku assigns PORT dynamically) 
+EXPOSE 8080
 
 # Run the binary
 CMD ["./music-bot"] 
