@@ -23,6 +23,7 @@ type Track struct {
 	Artist      string `json:"artist"`
 	Album       string `json:"album"`
 	SpotifyURL  string `json:"spotify_url"`
+	PreviewURL  string `json:"preview_url"`
 	Duration    int    `json:"duration_ms"`
 }
 
@@ -103,6 +104,7 @@ func (c *Client) GetArtistTopTracks(artistID string, country string) ([]Track, e
 			Artist:     artistNames[0], // Use primary artist
 			Album:      track.Album.Name,
 			SpotifyURL: track.ExternalURLs["spotify"],
+			PreviewURL: track.PreviewURL,
 			Duration:   int(track.Duration),
 		})
 	}
@@ -173,6 +175,7 @@ func (c *Client) GetRecommendations(seedArtists []string, limit int) ([]Track, e
 				Artist:     artistNames[0],
 				Album:      track.Album.Name,
 				SpotifyURL: track.ExternalURLs["spotify"],
+				PreviewURL: track.PreviewURL,
 				Duration:   int(track.Duration),
 			})
 		}
@@ -244,6 +247,7 @@ func (c *Client) GetRecommendationsWithAttributes(seedArtists []string, attribut
 				Artist:     artistNames[0],
 				Album:      track.Album.Name,
 				SpotifyURL: track.ExternalURLs["spotify"],
+				PreviewURL: track.PreviewURL,
 				Duration:   int(track.Duration),
 			})
 		}

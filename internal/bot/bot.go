@@ -3,9 +3,11 @@ package bot
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"music-bot/internal/database"
 	"music-bot/internal/spotify"
+	"net/http"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -109,76 +111,209 @@ func (b *Bot) handleStart(message *tgbotapi.Message) {
 		return
 	}
 
-	welcomeText := fmt.Sprintf(`🎵 Welcome to Music Bot, %s!
+	welcomeText := fmt.Sprintf(`🎵✨ **WELCOME TO MUSIC BOT** ✨🎵
 
-I can help you discover new music based on your favorite artists.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Here's what I can do:
-🎤 Add your favorite artists
-📋 Generate personalized playlists
-🔍 Discover similar artists
-📅 Get daily music recommendations
+👋 **Hello, %s!** 
 
-Use /help to see all available commands.
+🤖 *Your Personal AI Music Curator*
 
-Let's start by adding some of your favorite artists! Use /add to begin.`, message.From.FirstName)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-	b.sendMessage(message.Chat.ID, welcomeText)
+🌟 **WHAT I CAN DO FOR YOU:**
+
+🎤 **Smart Artist Management**
+   *Add & organize your favorite artists*
+
+🎵 **AI-Powered Playlists** 
+   *30 tracks with instant previews*
+
+🔍 **Music Discovery Engine**
+   *Find similar artists & hidden gems*
+
+🎧 **Instant Preview Magic**
+   *Play 30-sec previews in Telegram!*
+
+📅 **Daily Music Delivery**
+   *Fresh playlists every morning at 9 AM*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 **GET STARTED:**
+Type /add to add your first favorite artist!
+
+💡 **Need help?** Use /help anytime
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, message.From.FirstName)
+
+	msg := tgbotapi.NewMessage(message.Chat.ID, welcomeText)
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	b.api.Send(msg)
 }
 
 // sendHelp sends the help message
 func (b *Bot) sendHelp(chatID int64) {
-	helpText := `🎵 Music Bot Commands:
+	helpText := `🎵✨ **MUSIC BOT COMMAND CENTER** ✨🎵
 
-/start - Start using the bot
-/help - Show this help message
-/add - Add a favorite artist
-/list - Show your favorite artists
-/remove - Remove an artist from favorites
-/playlist - Generate a new playlist
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🎯 How it works:
-1. Add your favorite artists with /add
-2. Generate playlists with /playlist
-3. Discover new music based on your taste!
+📋 **AVAILABLE COMMANDS:**
 
-Daily playlists are automatically sent every morning at 9 AM.`
+🚀 **/start**
+   *Initialize your music journey*
 
-	b.sendMessage(chatID, helpText)
+❓ **/help**
+   *Show this command guide*
+
+🎤 **/add**
+   *Add your favorite artists*
+
+📝 **/list**
+   *View your artist collection*
+
+🗑️ **/remove**
+   *Remove artists from favorites*
+
+🎵 **/playlist**
+   *Generate AI playlist with previews*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 **HOW IT WORKS:**
+
+**1️⃣ BUILD YOUR TASTE PROFILE**
+   Use /add to collect your favorite artists
+
+**2️⃣ GENERATE SMART PLAYLISTS**
+   Use /playlist for 30 personalized tracks
+
+**3️⃣ PREVIEW INSTANTLY**
+   Click ▶️ to play 30-sec previews in chat
+
+**4️⃣ DISCOVER NEW MUSIC**
+   AI finds similar artists & hidden gems
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎧 **PREVIEW MAGIC:**
+*Listen to any track without leaving Telegram!*
+
+⏰ **DAILY DELIVERY:**
+*Fresh playlists automatically at 9 AM*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+
+	msg := tgbotapi.NewMessage(chatID, helpText)
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	b.api.Send(msg)
 }
 
 // handleAddArtist handles adding a favorite artist
 func (b *Bot) handleAddArtist(message *tgbotapi.Message) {
 	b.userStates[message.From.ID] = "waiting_artist_name"
-	b.sendMessage(message.Chat.ID, "🎤 Please send me the name of the artist you'd like to add:")
+	
+	promptText := `🎤✨ **ADD FAVORITE ARTIST** ✨🎤
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔍 **ARTIST SEARCH:**
+
+Type the name of any artist you love!
+
+*Examples:*
+• Taylor Swift
+• Drake  
+• The Beatles
+• Billie Eilish
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💡 *I'll search Spotify and show you options to choose from*`
+
+	msg := tgbotapi.NewMessage(message.Chat.ID, promptText)
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	b.api.Send(msg)
 }
 
 // handleArtistSearch processes artist search and selection
 func (b *Bot) handleArtistSearch(message *tgbotapi.Message) {
 	artistName := strings.TrimSpace(message.Text)
 	if artistName == "" {
-		b.sendMessage(message.Chat.ID, "Please enter a valid artist name.")
+		errorText := `❌ **INVALID INPUT**
+
+Please enter a valid artist name.
+
+Try again with an artist you love! 🎵`
+
+		msg := tgbotapi.NewMessage(message.Chat.ID, errorText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
 		return
 	}
+
+	// Send searching message
+	searchingText := fmt.Sprintf(`🔍✨ **SEARCHING FOR:** *%s*
+
+⏳ *Scanning Spotify database...*
+🎵 *Finding the perfect match...*`, artistName)
+
+	searchMsg := tgbotapi.NewMessage(message.Chat.ID, searchingText)
+	searchMsg.ParseMode = tgbotapi.ModeMarkdown
+	b.api.Send(searchMsg)
 
 	// Search for artists on Spotify
 	artists, err := b.spotifyClient.SearchArtists(artistName, 5)
 	if err != nil {
 		log.Printf("Failed to search artists: %v", err)
-		b.sendMessage(message.Chat.ID, "Sorry, I couldn't search for artists right now. Please try again later.")
+		errorText := `❌ **SEARCH ERROR**
+
+🚫 *Couldn't search for artists right now*
+
+Please try again in a moment! 🔄`
+
+		msg := tgbotapi.NewMessage(message.Chat.ID, errorText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
 		return
 	}
 
 	if len(artists) == 0 {
-		b.sendMessage(message.Chat.ID, fmt.Sprintf("No artists found for '%s'. Please try a different name.", artistName))
+		noResultsText := fmt.Sprintf(`🚫 **NO RESULTS FOUND**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔍 *Searched for:* **%s**
+
+💡 **TRY:**
+• Check spelling
+• Use the artist's main name
+• Try different variations
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, artistName)
+
+		msg := tgbotapi.NewMessage(message.Chat.ID, noResultsText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
 		return
 	}
+
+	// Create beautiful artist selection interface
+	resultsText := fmt.Sprintf(`🎯✨ **SEARCH RESULTS** ✨🎯
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔍 *Found %d artists for:* **%s**
+
+👇 *Choose the right one:*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, len(artists), artistName)
 
 	// Create inline keyboard with artist options
 	var keyboard [][]tgbotapi.InlineKeyboardButton
 	for i, artist := range artists {
 		button := tgbotapi.NewInlineKeyboardButtonData(
-			fmt.Sprintf("%s", artist.Name),
+			fmt.Sprintf("🎤 %s", artist.Name),
 			fmt.Sprintf("add_artist:%s:%s", artist.SpotifyID, artist.Name),
 		)
 		keyboard = append(keyboard, []tgbotapi.InlineKeyboardButton{button})
@@ -190,10 +325,11 @@ func (b *Bot) handleArtistSearch(message *tgbotapi.Message) {
 	}
 
 	// Add cancel button
-	cancelButton := tgbotapi.NewInlineKeyboardButtonData("❌ Cancel", "cancel_add_artist")
+	cancelButton := tgbotapi.NewInlineKeyboardButtonData("❌ CANCEL SEARCH", "cancel_add_artist")
 	keyboard = append(keyboard, []tgbotapi.InlineKeyboardButton{cancelButton})
 
-	reply := tgbotapi.NewMessage(message.Chat.ID, "🔍 Found these artists. Please select one:")
+	reply := tgbotapi.NewMessage(message.Chat.ID, resultsText)
+	reply.ParseMode = tgbotapi.ModeMarkdown
 	reply.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(keyboard...)
 
 	b.api.Send(reply)
@@ -222,6 +358,129 @@ func (b *Bot) handleCallbackQuery(callback *tgbotapi.CallbackQuery) {
 			artistName := strings.Join(parts[1:], ":")
 			b.confirmRemoveArtist(callback.Message.Chat.ID, callback.From.ID, artistName)
 		}
+	case "preview":
+		if len(parts) >= 3 {
+			previewURL := parts[1]
+			trackInfo := strings.Join(parts[2:], ":")
+			b.sendAudioPreview(callback.Message.Chat.ID, previewURL, trackInfo)
+		}
+	case "no_preview":
+		// Handle "No Preview" button click
+		b.api.Request(tgbotapi.NewCallbackWithAlert(callback.ID, "🚫 Sorry, no preview is available for this track. Try opening it in Spotify instead!"))
+	}
+}
+
+// sendAudioPreview downloads and sends a 30-second audio preview
+func (b *Bot) sendAudioPreview(chatID int64, previewURL, trackInfo string) {
+	if previewURL == "" {
+		noPreviewText := `🚫 **NO PREVIEW AVAILABLE**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+😔 *Sorry, no preview available for this track*
+
+💡 **ALTERNATIVE:**
+Try opening it in Spotify for the full experience!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+
+		msg := tgbotapi.NewMessage(chatID, noPreviewText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
+		return
+	}
+
+	// Send loading message
+	loadingText := fmt.Sprintf(`⏳✨ **LOADING PREVIEW** ✨⏳
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎵 *Preparing:* **%s**
+
+📥 *Downloading 30-second preview...*
+🎧 *Get ready for some music magic!*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, trackInfo)
+
+	loadingMsg := tgbotapi.NewMessage(chatID, loadingText)
+	loadingMsg.ParseMode = tgbotapi.ModeMarkdown
+	b.api.Send(loadingMsg)
+
+	// Download the audio preview
+	resp, err := http.Get(previewURL)
+	if err != nil {
+		log.Printf("Failed to download preview: %v", err)
+		errorText := `❌ **DOWNLOAD FAILED**
+
+🚫 *Couldn't load the preview*
+
+💡 Try opening the track in Spotify instead!`
+
+		msg := tgbotapi.NewMessage(chatID, errorText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Bad response downloading preview: %d", resp.StatusCode)
+		errorText := `❌ **PREVIEW UNAVAILABLE**
+
+🚫 *Preview temporarily unavailable*
+
+💡 Try opening the track in Spotify instead!`
+
+		msg := tgbotapi.NewMessage(chatID, errorText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
+		return
+	}
+
+	// Read the audio data
+	audioData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Printf("Failed to read audio data: %v", err)
+		errorText := `❌ **PROCESSING FAILED**
+
+🚫 *Error processing the audio file*
+
+💡 Try opening the track in Spotify instead!`
+
+		msg := tgbotapi.NewMessage(chatID, errorText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
+		return
+	}
+
+	// Send as audio file with beautiful caption
+	audioMsg := tgbotapi.NewAudio(chatID, tgbotapi.FileBytes{
+		Name:  "preview.mp3",
+		Bytes: audioData,
+	})
+	audioMsg.Caption = fmt.Sprintf(`🎵✨ **PREVIEW READY** ✨🎵
+
+🎧 **%s**
+
+⏱️ *30-second preview*
+🎶 *Tap to play instantly!*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, trackInfo)
+	audioMsg.Duration = 30 // 30-second preview
+	audioMsg.ParseMode = tgbotapi.ModeMarkdown
+
+	_, err = b.api.Send(audioMsg)
+	if err != nil {
+		log.Printf("Failed to send audio: %v", err)
+		errorText := `❌ **SEND FAILED**
+
+🚫 *Couldn't send the preview*
+
+💡 Try opening the track in Spotify instead!`
+
+		msg := tgbotapi.NewMessage(chatID, errorText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
 	}
 }
 
@@ -235,7 +494,15 @@ func (b *Bot) confirmAddArtist(chatID int64, userTelegramID int64, spotifyID, ar
 		user, err = b.db.CreateUser(userTelegramID, "", "", "")
 		if err != nil {
 			log.Printf("Failed to create user: %v", err)
-			b.sendMessage(chatID, "Sorry, there was an error setting up your account. Please try /start first.")
+			errorText := `❌ **ACCOUNT ERROR**
+
+🚫 *Error setting up your account*
+
+Please try /start first! 🚀`
+
+			msg := tgbotapi.NewMessage(chatID, errorText)
+			msg.ParseMode = tgbotapi.ModeMarkdown
+			b.api.Send(msg)
 			return
 		}
 	}
@@ -244,10 +511,30 @@ func (b *Bot) confirmAddArtist(chatID int64, userTelegramID int64, spotifyID, ar
 	err = b.db.AddUserArtist(user.ID, artistName, spotifyID)
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
-			b.sendMessage(chatID, fmt.Sprintf("🎤 %s is already in your favorites!", artistName))
+			duplicateText := fmt.Sprintf(`🔄 **ALREADY IN COLLECTION**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎤 **%s** is already in your favorites!
+
+💡 *Try adding a different artist*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, artistName)
+
+			msg := tgbotapi.NewMessage(chatID, duplicateText)
+			msg.ParseMode = tgbotapi.ModeMarkdown
+			b.api.Send(msg)
 		} else {
 			log.Printf("Failed to add artist: %v", err)
-			b.sendMessage(chatID, "Sorry, there was an error adding the artist.")
+			errorText := `❌ **ADD ERROR**
+
+🚫 *Error adding the artist*
+
+Please try again! 🔄`
+
+			msg := tgbotapi.NewMessage(chatID, errorText)
+			msg.ParseMode = tgbotapi.ModeMarkdown
+			b.api.Send(msg)
 		}
 		return
 	}
@@ -255,8 +542,26 @@ func (b *Bot) confirmAddArtist(chatID int64, userTelegramID int64, spotifyID, ar
 	// Clear user state
 	delete(b.userStates, userTelegramID)
 
-	successText := fmt.Sprintf("✅ Added %s to your favorites!\n\nUse /add to add more artists or /playlist to generate a playlist.", artistName)
-	b.sendMessage(chatID, successText)
+	successText := fmt.Sprintf(`✅✨ **ARTIST ADDED!** ✨✅
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎤 **%s** 
+💚 *Added to your favorites!*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 **WHAT'S NEXT?**
+
+🎵 Use /add to add more artists
+📋 Use /list to view your collection  
+🎶 Use /playlist to generate music!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, artistName)
+
+	msg := tgbotapi.NewMessage(chatID, successText)
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	b.api.Send(msg)
 }
 
 // handleListArtists shows user's favorite artists
@@ -267,7 +572,15 @@ func (b *Bot) handleListArtists(message *tgbotapi.Message) {
 		user, err = b.db.CreateUser(message.From.ID, message.From.UserName, message.From.FirstName, message.From.LastName)
 		if err != nil {
 			log.Printf("Failed to create user: %v", err)
-			b.sendMessage(message.Chat.ID, "Sorry, there was an error setting up your account. Please try /start first.")
+			errorText := `❌ **ACCOUNT ERROR**
+
+🚫 *Error setting up your account*
+
+Please try /start first! 🚀`
+
+			msg := tgbotapi.NewMessage(message.Chat.ID, errorText)
+			msg.ParseMode = tgbotapi.ModeMarkdown
+			b.api.Send(msg)
 			return
 		}
 	}
@@ -275,24 +588,70 @@ func (b *Bot) handleListArtists(message *tgbotapi.Message) {
 	artists, err := b.db.GetUserArtists(user.ID)
 	if err != nil {
 		log.Printf("Failed to get user artists: %v", err)
-		b.sendMessage(message.Chat.ID, "Sorry, there was an error retrieving your artists.")
+		errorText := `❌ **RETRIEVAL ERROR**
+
+🚫 *Error retrieving your artists*
+
+Please try again! 🔄`
+
+		msg := tgbotapi.NewMessage(message.Chat.ID, errorText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
 		return
 	}
 
 	if len(artists) == 0 {
-		b.sendMessage(message.Chat.ID, "🎤 You haven't added any favorite artists yet.\n\nUse /add to add your first artist!")
+		emptyText := `🎤✨ **YOUR ARTIST COLLECTION** ✨🎤
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📭 **COLLECTION EMPTY**
+
+You haven't added any favorite artists yet!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 **GET STARTED:**
+
+Use /add to add your first artist and start building your music profile!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+
+		msg := tgbotapi.NewMessage(message.Chat.ID, emptyText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
 		return
 	}
 
 	var text strings.Builder
-	text.WriteString("🎤 Your Favorite Artists:\n\n")
-	for i, artist := range artists {
-		text.WriteString(fmt.Sprintf("%d. %s\n", i+1, artist.ArtistName))
-	}
-	text.WriteString(fmt.Sprintf("\nTotal: %d artists", len(artists)))
-	text.WriteString("\n\nUse /remove to remove artists or /playlist to generate a playlist.")
+	text.WriteString(`🎤✨ **YOUR ARTIST COLLECTION** ✨🎤
 
-	b.sendMessage(message.Chat.ID, text.String())
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+`)
+
+	for i, artist := range artists {
+		text.WriteString(fmt.Sprintf("🎵 **%d.** %s\n", i+1, artist.ArtistName))
+	}
+	
+	text.WriteString(fmt.Sprintf(`
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 **Total Artists:** %d
+🎶 **Status:** Ready for playlists!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚀 **ACTIONS:**
+
+🗑️ Use /remove to remove artists
+🎵 Use /playlist to generate music!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`, len(artists)))
+
+	msg := tgbotapi.NewMessage(message.Chat.ID, text.String())
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	b.api.Send(msg)
 }
 
 // handleRemoveArtist handles removing an artist
@@ -380,12 +739,41 @@ func (b *Bot) handleGeneratePlaylist(message *tgbotapi.Message) {
 	}
 
 	if len(artists) == 0 {
-		b.sendMessage(message.Chat.ID, "🎤 You need to add some favorite artists first!\n\nUse /add to add artists, then try generating a playlist.")
+		emptyArtistsText := `🎤 **ARTIST COLLECTION EMPTY**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚫 *You need favorite artists to generate playlists!*
+
+🚀 **GET STARTED:**
+
+Use /add to add artists, then try generating a playlist.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+
+		msg := tgbotapi.NewMessage(message.Chat.ID, emptyArtistsText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
 		return
 	}
 
-	// Send "generating" message
-	b.sendMessage(message.Chat.ID, "🎵 Generating your personalized playlist... This may take a moment.")
+	// Send beautiful generating message
+	generatingText := `🎵✨ **GENERATING YOUR PLAYLIST** ✨🎵
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🤖 *AI is analyzing your music taste...*
+🎯 *Finding perfect track combinations...*
+🔍 *Discovering similar artists...*
+🎶 *Creating 30 personalized tracks...*
+
+⏳ *This may take a moment...*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+
+	generatingMsg := tgbotapi.NewMessage(message.Chat.ID, generatingText)
+	generatingMsg.ParseMode = tgbotapi.ModeMarkdown
+	b.api.Send(generatingMsg)
 
 	// Extract Spotify IDs
 	var spotifyIDs []string
@@ -399,25 +787,147 @@ func (b *Bot) handleGeneratePlaylist(message *tgbotapi.Message) {
 	tracks, err := b.spotifyClient.GeneratePlaylistForArtists(spotifyIDs, 30)
 	if err != nil {
 		log.Printf("Failed to generate playlist: %v", err)
-		b.sendMessage(message.Chat.ID, "Sorry, I couldn't generate a playlist right now. Please try again later.")
+		errorText := `❌ **PLAYLIST GENERATION FAILED**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🚫 *Couldn't generate a playlist right now*
+
+💡 **POSSIBLE CAUSES:**
+• Spotify API temporarily unavailable
+• Network connection issues
+• Service maintenance
+
+🔄 *Please try again in a moment!*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+
+		msg := tgbotapi.NewMessage(message.Chat.ID, errorText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
 		return
 	}
 
 	if len(tracks) == 0 {
-		b.sendMessage(message.Chat.ID, "Sorry, I couldn't find enough tracks to create a playlist. Try adding more artists!")
+		noTracksText := `🚫 **NO TRACKS FOUND**
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+😔 *Couldn't find enough tracks to create a playlist*
+
+💡 **SUGGESTIONS:**
+• Add more artists to your collection
+• Try different artist genres
+• Check your artist spellings
+
+🎵 *Use /add to expand your music taste!*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+
+		msg := tgbotapi.NewMessage(message.Chat.ID, noTracksText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		b.api.Send(msg)
 		return
 	}
 
-	// Format and send playlist
-	playlistText := b.formatPlaylist(tracks)
-	b.sendMessage(message.Chat.ID, playlistText)
+	// Send playlist with preview functionality
+	b.sendPlaylistWithPreviews(message.Chat.ID, tracks)
 
 	// Save playlist to database
 	playlistJSON, _ := json.Marshal(tracks)
 	b.db.SavePlaylist(user.ID, string(playlistJSON))
 }
 
-// formatPlaylist formats tracks into a readable message
+// sendPlaylistWithPreviews sends a playlist with individual track cards and preview buttons
+func (b *Bot) sendPlaylistWithPreviews(chatID int64, tracks []spotify.Track) {
+	// Send beautiful playlist header with animated design
+	headerText := `🎵✨ **YOUR PERSONALIZED PLAYLIST** ✨🎵
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎼 **` + fmt.Sprintf("%d", len(tracks)) + ` HANDPICKED TRACKS** 🎼
+💫 *Curated by AI based on your music taste*
+
+🎧 **PREVIEW MAGIC**: Tap ▶️ to play 30-second previews instantly!
+🚀 **INSTANT ACCESS**: No app switching needed!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+
+	msg := tgbotapi.NewMessage(chatID, headerText)
+	msg.ParseMode = tgbotapi.ModeMarkdown
+	b.api.Send(msg)
+
+	// Send each track with beautiful design
+	for i, track := range tracks {
+		// Create stunning track card design
+		trackText := fmt.Sprintf(`┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃  🎵 **TRACK #%d**                              ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+🎤 **Artist**: %s
+🎶 **Song**: *%s*
+💿 **Album**: _%s_
+
+%s━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━%s`,
+			i+1,
+			track.Artist,
+			track.Name,
+			track.Album,
+			"🌟",
+			"🌟")
+
+		// Create beautiful inline keyboard with enhanced buttons
+		var keyboard [][]tgbotapi.InlineKeyboardButton
+		
+		// Row 1: Preview and Spotify buttons with enhanced design
+		var row1 []tgbotapi.InlineKeyboardButton
+		
+		if track.PreviewURL != "" {
+			previewBtn := tgbotapi.NewInlineKeyboardButtonData(
+				"▶️ 🎧 PLAY PREVIEW",
+				fmt.Sprintf("preview:%s:%s - %s", track.PreviewURL, track.Artist, track.Name),
+			)
+			row1 = append(row1, previewBtn)
+		} else {
+			// Add a disabled-style button when no preview
+			noPreviewBtn := tgbotapi.NewInlineKeyboardButtonData(
+				"🚫 No Preview",
+				"no_preview",
+			)
+			row1 = append(row1, noPreviewBtn)
+		}
+		
+		if track.SpotifyURL != "" {
+			spotifyBtn := tgbotapi.NewInlineKeyboardButtonURL("🎵 OPEN SPOTIFY", track.SpotifyURL)
+			row1 = append(row1, spotifyBtn)
+		}
+		
+		keyboard = append(keyboard, row1)
+
+		// Send beautiful track message
+		msg := tgbotapi.NewMessage(chatID, trackText)
+		msg.ParseMode = tgbotapi.ModeMarkdown
+		msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(keyboard...)
+		
+		b.api.Send(msg)
+	}
+
+	// Send beautiful playlist footer
+	footerText := `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 **PLAYLIST COMPLETE!** 🎉
+
+🔥 *Enjoy your personalized music journey*
+💝 *Discover new favorites and hidden gems*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`
+
+	footerMsg := tgbotapi.NewMessage(chatID, footerText)
+	footerMsg.ParseMode = tgbotapi.ModeMarkdown
+	b.api.Send(footerMsg)
+}
+
+// formatPlaylist formats tracks into a readable message (legacy format, kept for daily playlists)
 func (b *Bot) formatPlaylist(tracks []spotify.Track) string {
 	var text strings.Builder
 	text.WriteString("🎵 Your Personalized Playlist:\n\n")
@@ -426,6 +936,9 @@ func (b *Bot) formatPlaylist(tracks []spotify.Track) string {
 		text.WriteString(fmt.Sprintf("%d. %s - %s\n", i+1, track.Artist, track.Name))
 		if track.SpotifyURL != "" {
 			text.WriteString(fmt.Sprintf("   🎧 [Listen on Spotify](%s)\n", track.SpotifyURL))
+		}
+		if track.PreviewURL != "" {
+			text.WriteString("   ▶️ Preview available\n")
 		}
 		text.WriteString("\n")
 	}
